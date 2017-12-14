@@ -21,6 +21,8 @@ entrada = entrada./normas_entradas
 n_iteraciones = 20
 filas_smo = 12
 columnas_smo = 8
+radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1 
+#incialmente cubre el maximo de la dimension mas pequeña sin overlap
 
 n_neuronas = filas_smo*columnas_smo #tamaño del espacio de salida
 tam_espacio_entrada = tamanyo_entrada+1#por la coordenada extra
@@ -33,26 +35,82 @@ pesos = [pesos,ones(n_neuronas,1)] #añadida coordenada extra
 normas_pesos = sqrt(sum(pesos.^2,2))
 pesos = pesos./normas_pesos
 
-#d[i][j] = distancia de la instancia i a la neurona j
-distancias = zeros(numero_instancias,n_neuronas)
+#todos los vectores entrada y pesos son unitarios, por lo que podemos utilizar
+#el coseno del angulo entre ellos. El maximo coseno implicara la neurona mas cercana:
+#
+#   analiticamente: x w = producto escalar = sum(x_i*w_i)
+#   geometricamente: x w = |x||w|cos(x,w) = 1*1*cos(x,w) = cos(x,w)
+#
+#por lo que podemos calcular el coseno del angulo como sum(x_i*w_i)
+
+#necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
+cosenos = zeros(1,n_neuronas)
 i = 1
-indice_ganadoras = zeros(numero_instancias,1)
-#por cada entrada
+#por cada muestra
 while i<=numero_instancias #TODO: ufuncs
-  j=1
-  #por cada neurona
-  while j<=n_neuronas
-    distancias(i,j) = sum(entrada(i,:).*pesos(j,:))
-    j++
+  cosenos = sum(entrada(i,:).*pesos,2) 
+  [x,ganadora] = max(cosenos)#x se desecha, es el valor, nos interesa el indice
+  
+  #calculamos la fila y columna de la ganadora para hacer mas facil calculos siguientes
+  #indice = (fila-1)*NUMCOL + columna
+  #fila = floor(indice/NUMCOL)+1 (se suma 1 ya que se indexa por 1)
+  #columna = mod(indice,NUMCOL)+1 (idem)
+  #tras esto se las multiplica por el numero de filas/columnas respectivamente para asegurar aciclidad
+  fila_ganadora = ceil(ganadora/columnas_smo)
+  columna_ganadora = mod(ganadora,columnas_smo)
+  
+  if columna_ganadora == 0
+    columna_ganadora = columnas_smo
+  endif
+  
+  #modificamos las vecinas
+  
+  #se añade una fila a recorrer por cada unidad que aumenta el radio, mas la fila de la ganadora
+  filas_a_recorrer = (radio_vecindad*2)+1
+  #idem
+  columnas_a_recorrer = (radio_vecindad*2)+1
+  
+  recorriendo_fila = fila_ganadora-radio_vecindad
+  
+  indices_vecinas = zeros(n_neuronas,1)
+  indices_vecinas(1) = ganadora
+  
+  iz = 2
+  fi=1  
+  while fi<=filas_a_recorrer
+    recorriendo_columna = columna_ganadora-radio_vecindad 
+    co=1
+    while co<=columnas_a_recorrer
+    
+      fila_vecina = mod(recorriendo_fila,filas_smo)
+      if fila_vecina == 0
+        fila_vecina = filas_smo
+      endif
+      
+      columna_vecina = mod(recorriendo_columna,columnas_smo)
+      if columna_vecina == 0
+        columna_vecina = columnas_smo
+      endif
+      
+      #necesario calcular el indice?
+      indice = (fila_vecina-1)*columnas_smo + columna_vecina
+      
+      if indice==ganadora
+        #no modificar indice
+      endif
+      #modificar indice
+      indices_vecinas(iz) = indice
+      recorriendo_columna++
+      co++
+      iz++
+    end
+    recorriendo_fila++
+    fi++
   end
-  [x,indice_ganadoras(i)] = min(distancias(i,:))
   i++
 end
-
-[x,indice_ganadoras2] = min(distancias,2)
-#modulo del indice (ciclico)
-#radio inicial para cubrir toda la dimension mas pequeña sin pisarse al ser ciclico
 #alfa = alfa_0/(1+(t/n_muestras)) t AUMENTA POR CADA MUESTRA, PERO NO VUELVE A 0 TRAS FIN DE EPOCA
 #alfa inicial no entre 0 y 1 a ojo (10, 20)
-#arquitectura del mapa cuadrado.
 #etiquetado por neuronas (necesitas las salidas)
+#luego se le da a un mlp (codigo en carpeta TAA de onedrive)
+
