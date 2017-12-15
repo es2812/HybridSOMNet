@@ -1,6 +1,7 @@
 lines = dlmread('../originalFiles/digitos.test.normalizados.txt',' ')
 longitud_fichero = length(lines(:,1))
 tamanyo_entrada = length(lines(1,:))
+tamanyo_salida = 10
 
 #el fichero esta formateado como [entrada,empty line,salida,empty line] por lo que nos interesa
 #cada cuarta linea de la matriz
@@ -29,7 +30,7 @@ tam_espacio_entrada = tamanyo_entrada+1#por la coordenada extra
 
 #inicializamos pesos aleatorios (entre -5 y 5)
 #p[i][j] = peso de la neurona i para la dimension del espacio de entrada j
-pesos = rand(n_neuronas,tamanyo_entrada)
+pesos = (rand(n_neuronas,tamanyo_entrada)*10)-5
 #normalizamos
 pesos = [pesos,ones(n_neuronas,1)] #añadida coordenada extra
 normas_pesos = sqrt(sum(pesos.^2,2))
@@ -59,7 +60,7 @@ while epoca <= n_iteraciones
 
     muestra_actual = entrada(i,:)
   
-    cosenos = sum(muestra_actual.*pesos,2) 
+    cosenos = muestra_actual*pesos'
     [x,ganadora] = max(cosenos)#x se desecha, es el valor, nos interesa el indice
     #modificamos el peso de la ganadora
     peso_no_normal = pesos(ganadora,:)+(muestra_actual.*alfa)
@@ -126,6 +127,31 @@ while epoca <= n_iteraciones
   epoca++
 end
 
-#etiquetado por neuronas (necesitas las salidas)
+#Entrenamiento terminado.
+
+#etiquetado por neuronas
+indices_salida = [3:4:longitud_fichero]
+#la salida esta formateada como un vector con tantos componentes con 0.9 en el 
+#numero al que corresponde y el resto 0.1s
+salida = lines(indices_salida,1:tamanyo_salida)
+#obtenemos el digito que representa la salida
+salida_numerica = repmat([1:tamanyo_salida],numero_instancias,1)(salida==0.9)
+
+etiquetas = zeros(n_neuronas,1)
+#se recorren todas las neuronas, se encuentra la muestra mas cercana, y se le aplica su clase
+im = 1
+cosenos = zeros(numero_instancias,1)
+while im<=n_neuronas
+   
+  cosenos = entrada*pesos(im,:)' #vector con los cosenos entre todas las entradas y la neurona actual
+  [x,muestra_ganadora] = max(cosenos)
+  etiquetas(im) = salida_numerica(muestra_ganadora) #salida(i) corresponde a entrada(i)
+  
+  im++
+end
+
+#etiquetado terminado 
+
+
 #luego se le da a un mlp (codigo en carpeta TAA de onedrive)
 
