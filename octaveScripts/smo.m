@@ -21,8 +21,8 @@ entrada = entrada./normas_entradas
 n_iteraciones = 20
 filas_smo = 12
 columnas_smo = 8
-radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1 
-#incialmente cubre el maximo de la dimension mas pequeña sin overlap
+radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1 #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
+alfa_inicial = 10 #alfa inicial (probar 20)
 
 n_neuronas = filas_smo*columnas_smo #tamaño del espacio de salida
 tam_espacio_entrada = tamanyo_entrada+1#por la coordenada extra
@@ -45,72 +45,87 @@ pesos = pesos./normas_pesos
 
 #necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
 cosenos = zeros(1,n_neuronas)
-i = 1
-#por cada muestra
-while i<=numero_instancias #TODO: ufuncs
-  cosenos = sum(entrada(i,:).*pesos,2) 
-  [x,ganadora] = max(cosenos)#x se desecha, es el valor, nos interesa el indice
-  
-  #calculamos la fila y columna de la ganadora para hacer mas facil calculos siguientes
-  #indice = (fila-1)*NUMCOL + columna
-  #fila = floor(indice/NUMCOL)+1 (se suma 1 ya que se indexa por 1)
-  #columna = mod(indice,NUMCOL)+1 (idem)
-  #tras esto se las multiplica por el numero de filas/columnas respectivamente para asegurar aciclidad
-  fila_ganadora = ceil(ganadora/columnas_smo)
-  columna_ganadora = mod(ganadora,columnas_smo)
-  
-  if columna_ganadora == 0
-    columna_ganadora = columnas_smo
-  endif
-  
-  #modificamos las vecinas
-  
-  #se añade una fila a recorrer por cada unidad que aumenta el radio, mas la fila de la ganadora
-  filas_a_recorrer = (radio_vecindad*2)+1
-  #idem
-  columnas_a_recorrer = (radio_vecindad*2)+1
-  
-  recorriendo_fila = fila_ganadora-radio_vecindad
-  
-  indices_vecinas = zeros(n_neuronas,1)
-  indices_vecinas(1) = ganadora
-  
-  iz = 2
-  fi=1  
-  while fi<=filas_a_recorrer
-    recorriendo_columna = columna_ganadora-radio_vecindad 
-    co=1
-    while co<=columnas_a_recorrer
+
+
+epoca = 1
+t = 0 #tiempo. NO se resetea cuando acaba la epoca
+while epoca <= n_iteraciones
+  i = 1
+  #por cada muestra
+  while i<=numero_instancias #TODO: ufuncs
     
-      fila_vecina = mod(recorriendo_fila,filas_smo)
-      if fila_vecina == 0
-        fila_vecina = filas_smo
+    #se designa el alfa para esta muestra
+    alfa = alfa_inicial/(1+(t/numero_instancias))
+
+    muestra_actual = entrada(i,:)
+  
+    cosenos = sum(muestra_actual.*pesos,2) 
+    [x,ganadora] = max(cosenos)#x se desecha, es el valor, nos interesa el indice
+    #modificamos el peso de la ganadora
+    peso_no_normal = pesos(ganadora,:)+(muestra_actual.*alfa)
+    normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2))
+    pesos(ganadora,:) = (peso_no_normal)./(normas_nuevo_peso)
+  
+    #BUCLE DE ENCUENTRO Y MODIFICACION DE VECINAS
+    #solo necesario cuando el radio de vecindad es > 0, si R=0, solo necesitamos modificar la ganadora
+    if radio_vecindad > 0
+      #calculamos la fila y columna de la ganadora para hacer mas facil calculos siguientes
+      #indice = (fila-1)*NUMCOL + columna
+      #fila = ceil(indice/NUMCOL) (por el indexado por 1. Si fuera indexado por 0 seria floor)
+      #columna = mod(indice,NUMCOL)+1 (idem)
+      fila_ganadora = ceil(ganadora/columnas_smo)
+      columna_ganadora = mod(ganadora,columnas_smo)
+      #debido al indexado por 1, lo que matematicamente es la columna 0, en realidad es la ultima
+      if columna_ganadora == 0
+        columna_ganadora = columnas_smo
       endif
-      
-      columna_vecina = mod(recorriendo_columna,columnas_smo)
-      if columna_vecina == 0
-        columna_vecina = columnas_smo
-      endif
-      
-      #necesario calcular el indice?
-      indice = (fila_vecina-1)*columnas_smo + columna_vecina
-      
-      if indice==ganadora
-        #no modificar indice
-      endif
-      #modificar indice
-      indices_vecinas(iz) = indice
-      recorriendo_columna++
-      co++
-      iz++
-    end
-    recorriendo_fila++
-    fi++
+    
+      #se añade una fila a recorrer por cada unidad que aumenta el radio, mas la fila de la ganadora
+      filas_a_recorrer = (radio_vecindad*2)+1
+      #idem
+      columnas_a_recorrer = (radio_vecindad*2)+1
+
+      recorriendo_fila = fila_ganadora-radio_vecindad
+      fi=1  
+      while fi<=filas_a_recorrer
+        recorriendo_columna = columna_ganadora-radio_vecindad 
+        co=1
+        while co<=columnas_a_recorrer
+          #debido al caracter ciclico del mapa, se debe calcular el modulo
+          fila_vecina = mod(recorriendo_fila,filas_smo)
+          #debido al indexado por 1, lo que matematicamente es la columna/fila 0, en realidad es la ultima
+          if fila_vecina == 0
+            fila_vecina = filas_smo
+          endif
+          columna_vecina = mod(recorriendo_columna,columnas_smo)
+          if columna_vecina == 0
+            columna_vecina = columnas_smo
+          endif
+          #modificamos el peso de la neurona vecina
+          indice_v = (fila_vecina-1)*columnas_smo + columna_vecina
+          #este metodo detecta tambien la propia neurona ganadora, que ya modificamos antes, la ignoramos
+          if indice_v != ganadora
+            peso_no_normal = pesos(indice_v,:)+(muestra_actual.*alfa)
+            normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2))
+            pesos(indice_v,:) = (peso_no_normal)./(normas_nuevo_peso)
+          endif
+          recorriendo_columna++
+          co++
+        end
+        recorriendo_fila++
+        fi++
+      end
+    endif
+    i++
+    t++
   end
-  i++
+  #se modifica el radio de vecindad, acabara siendo 0
+  if radio_vecindad>0
+    radio_vecindad--
+  endif
+  epoca++
 end
-#alfa = alfa_0/(1+(t/n_muestras)) t AUMENTA POR CADA MUESTRA, PERO NO VUELVE A 0 TRAS FIN DE EPOCA
-#alfa inicial no entre 0 y 1 a ojo (10, 20)
+
 #etiquetado por neuronas (necesitas las salidas)
 #luego se le da a un mlp (codigo en carpeta TAA de onedrive)
 
