@@ -1,40 +1,41 @@
-lines = dlmread('../originalFiles/digitos.test.normalizados.txt',' ')
-longitud_fichero = length(lines(:,1))
-tamanyo_entrada = length(lines(1,:))
-tamanyo_salida = 10
+#ENTRENAMIENTO
+lines = dlmread('../originalFiles/digitos.entrena.normalizados.txt',' ');
+longitud_fichero = length(lines(:,1));
+tamanyo_entrada = length(lines(1,:));
+tamanyo_salida = 10;
 
 #el fichero esta formateado como [entrada,empty line,salida,empty line] por lo que nos interesa
 #cada cuarta linea de la matriz
 
-indices_entradas = [1:4:longitud_fichero]
-numero_instancias = length(indices_entradas)
-entrada = lines(indices_entradas,:)
+indices_entradas = [1:4:longitud_fichero];
+numero_instancias = length(indices_entradas);
+entrada = lines(indices_entradas,:);
 
 #se añade una dimension a cada instancia para evitar igualdad de vectores al normalizar
-entrada = [entrada,ones(numero_instancias,1)]
+entrada = [entrada,ones(numero_instancias,1)];
 
 #se calcula la norma de cada instancia como la raiz cuadrada de la suma de los cuadrados
 #y se divide cada componente del vector por esta norma, tal quedan vectores de norma 1.
-normas_entradas = sqrt(sum(entrada.^2,2))
-entrada = entrada./normas_entradas 
+normas_entradas = sqrt(sum(entrada.^2,2));
+entrada = entrada./normas_entradas ;
 
 #SMO. CONSTANTES:
-n_iteraciones = 20
-filas_smo = 12
-columnas_smo = 8
-radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1 #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
-alfa_inicial = 10 #alfa inicial (probar 20)
+n_iteraciones = 20;
+filas_smo = 12;
+columnas_smo = 8;
+radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1; #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
+alfa_inicial = 10; #alfa inicial (probar 20)
 
-n_neuronas = filas_smo*columnas_smo #tamaño del espacio de salida
-tam_espacio_entrada = tamanyo_entrada+1#por la coordenada extra
+n_neuronas = filas_smo*columnas_smo; #tamaño del espacio de salida
+tam_espacio_entrada = tamanyo_entrada+1; #por la coordenada extra
 
 #inicializamos pesos aleatorios (entre -5 y 5)
 #p[i][j] = peso de la neurona i para la dimension del espacio de entrada j
-pesos = (rand(n_neuronas,tamanyo_entrada)*10)-5
+pesos = (rand(n_neuronas,tamanyo_entrada)*10)-5;
 #normalizamos
-pesos = [pesos,ones(n_neuronas,1)] #añadida coordenada extra
-normas_pesos = sqrt(sum(pesos.^2,2))
-pesos = pesos./normas_pesos
+pesos = [pesos,ones(n_neuronas,1)]; #añadida coordenada extra
+normas_pesos = sqrt(sum(pesos.^2,2));
+pesos = pesos./normas_pesos;
 
 #todos los vectores entrada y pesos son unitarios, por lo que podemos utilizar
 #el coseno del angulo entre ellos. El maximo coseno implicara la neurona mas cercana:
@@ -45,27 +46,27 @@ pesos = pesos./normas_pesos
 #por lo que podemos calcular el coseno del angulo como sum(x_i*w_i)
 
 #necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
-cosenos = zeros(1,n_neuronas)
+cosenos = zeros(1,n_neuronas);
 
 
-epoca = 1
-t = 0 #tiempo. NO se resetea cuando acaba la epoca
+epoca = 1;
+t = 0; #tiempo. NO se resetea cuando acaba la epoca
 while epoca <= n_iteraciones
-  i = 1
+  i = 1;
   #por cada muestra
   while i<=numero_instancias #TODO: ufuncs
     
     #se designa el alfa para esta muestra
-    alfa = alfa_inicial/(1+(t/numero_instancias))
+    alfa = alfa_inicial/(1+(t/numero_instancias));
 
-    muestra_actual = entrada(i,:)
+    muestra_actual = entrada(i,:);
   
-    cosenos = muestra_actual*pesos'
-    [x,ganadora] = max(cosenos)#x se desecha, es el valor, nos interesa el indice
+    cosenos = muestra_actual*pesos';
+    [x,ganadora] = max(cosenos); #x se desecha, es el valor, nos interesa el indice
     #modificamos el peso de la ganadora
-    peso_no_normal = pesos(ganadora,:)+(muestra_actual.*alfa)
-    normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2))
-    pesos(ganadora,:) = (peso_no_normal)./(normas_nuevo_peso)
+    peso_no_normal = pesos(ganadora,:)+(muestra_actual.*alfa);
+    normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2));
+    pesos(ganadora,:) = (peso_no_normal)./(normas_nuevo_peso);
   
     #BUCLE DE ENCUENTRO Y MODIFICACION DE VECINAS
     #solo necesario cuando el radio de vecindad es > 0, si R=0, solo necesitamos modificar la ganadora
@@ -74,84 +75,81 @@ while epoca <= n_iteraciones
       #indice = (fila-1)*NUMCOL + columna
       #fila = ceil(indice/NUMCOL) (por el indexado por 1. Si fuera indexado por 0 seria floor)
       #columna = mod(indice,NUMCOL)+1 (idem)
-      fila_ganadora = ceil(ganadora/columnas_smo)
-      columna_ganadora = mod(ganadora,columnas_smo)
+      fila_ganadora = ceil(ganadora/columnas_smo);
+      columna_ganadora = mod(ganadora,columnas_smo);
       #debido al indexado por 1, lo que matematicamente es la columna 0, en realidad es la ultima
       if columna_ganadora == 0
-        columna_ganadora = columnas_smo
+        columna_ganadora = columnas_smo;
       endif
     
       #se añade una fila a recorrer por cada unidad que aumenta el radio, mas la fila de la ganadora
-      filas_a_recorrer = (radio_vecindad*2)+1
+      filas_a_recorrer = (radio_vecindad*2)+1;
       #idem
-      columnas_a_recorrer = (radio_vecindad*2)+1
+      columnas_a_recorrer = (radio_vecindad*2)+1;
 
-      recorriendo_fila = fila_ganadora-radio_vecindad
-      fi=1  
+      recorriendo_fila = fila_ganadora-radio_vecindad;
+      fi=1;  
       while fi<=filas_a_recorrer
-        recorriendo_columna = columna_ganadora-radio_vecindad 
-        co=1
+        recorriendo_columna = columna_ganadora-radio_vecindad ;
+        co=1;
         while co<=columnas_a_recorrer
           #debido al caracter ciclico del mapa, se debe calcular el modulo
-          fila_vecina = mod(recorriendo_fila,filas_smo)
+          fila_vecina = mod(recorriendo_fila,filas_smo);
           #debido al indexado por 1, lo que matematicamente es la columna/fila 0, en realidad es la ultima
           if fila_vecina == 0
-            fila_vecina = filas_smo
+            fila_vecina = filas_smo;
           endif
-          columna_vecina = mod(recorriendo_columna,columnas_smo)
+          columna_vecina = mod(recorriendo_columna,columnas_smo);
           if columna_vecina == 0
-            columna_vecina = columnas_smo
+            columna_vecina = columnas_smo;
           endif
           #modificamos el peso de la neurona vecina
-          indice_v = (fila_vecina-1)*columnas_smo + columna_vecina
+          indice_v = (fila_vecina-1)*columnas_smo + columna_vecina;
           #este metodo detecta tambien la propia neurona ganadora, que ya modificamos antes, la ignoramos
           if indice_v != ganadora
-            peso_no_normal = pesos(indice_v,:)+(muestra_actual.*alfa)
-            normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2))
-            pesos(indice_v,:) = (peso_no_normal)./(normas_nuevo_peso)
+            peso_no_normal = pesos(indice_v,:)+(muestra_actual.*alfa);
+            normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2));
+            pesos(indice_v,:) = (peso_no_normal)./(normas_nuevo_peso);
           endif
-          recorriendo_columna++
-          co++
+          recorriendo_columna++;
+          co++;
         end
-        recorriendo_fila++
-        fi++
+        recorriendo_fila++;
+        fi++;
       end
     endif
-    i++
-    t++
+    i++;
+    t++;
   end
   #se modifica el radio de vecindad, acabara siendo 0
   if radio_vecindad>0
-    radio_vecindad--
+    radio_vecindad--;
   endif
-  epoca++
+  epoca++;
 end
 
 #Entrenamiento terminado.
 
 #etiquetado por neuronas
-indices_salida = [3:4:longitud_fichero]
+indices_salida = [3:4:longitud_fichero];
 #la salida esta formateada como un vector con tantos componentes con 0.9 en el 
 #numero al que corresponde y el resto 0.1s
-salida = lines(indices_salida,1:tamanyo_salida)
+salida = lines(indices_salida,1:tamanyo_salida);
 #obtenemos el digito que representa la salida
-salida_numerica = repmat([1:tamanyo_salida],numero_instancias,1)(salida==0.9)
+salida_numerica = repmat([0:tamanyo_salida-1],numero_instancias,1)(salida==0.9);
 
-etiquetas = zeros(n_neuronas,1)
+etiquetas = zeros(n_neuronas,1);
 #se recorren todas las neuronas, se encuentra la muestra mas cercana, y se le aplica su clase
-im = 1
-cosenos = zeros(numero_instancias,1)
+im = 1;
+cosenos = zeros(numero_instancias,1);
 while im<=n_neuronas
    
-  cosenos = entrada*pesos(im,:)' #vector con los cosenos entre todas las entradas y la neurona actual
-  [x,muestra_ganadora] = max(cosenos)
-  etiquetas(im) = salida_numerica(muestra_ganadora) #salida(i) corresponde a entrada(i)
+  cosenos = entrada*pesos(im,:)'; #vector con los cosenos entre todas las entradas y la neurona actual
+  [x,muestra_ganadora] = max(cosenos);
+  etiquetas(im) = salida_numerica(muestra_ganadora); #salida(i) corresponde a entrada(i)
   
-  im++
+  im++;
 end
 
+etiquetas_print = reshape(etiquetas,columnas_smo,filas_smo)'
 #etiquetado terminado 
-
-
-#luego se le da a un mlp (codigo en carpeta TAA de onedrive)
-
