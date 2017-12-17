@@ -20,7 +20,7 @@ normas_entradas = sqrt(sum(entrada.^2,2));
 entrada = entrada./normas_entradas ;
 
 #SMO. CONSTANTES:
-n_iteraciones = 20;
+n_iteraciones = 6;
 filas_smo = 12;
 columnas_smo = 8;
 radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1; #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
@@ -32,6 +32,7 @@ tam_espacio_entrada = tamanyo_entrada+1; #por la coordenada extra
 #inicializamos pesos aleatorios (entre -5 y 5)
 #p[i][j] = peso de la neurona i para la dimension del espacio de entrada j
 pesos = (rand(n_neuronas,tamanyo_entrada)*10)-5;
+
 #normalizamos
 pesos = [pesos,ones(n_neuronas,1)]; #añadida coordenada extra
 normas_pesos = sqrt(sum(pesos.^2,2));
@@ -46,31 +47,32 @@ pesos = pesos./normas_pesos;
 #por lo que podemos calcular el coseno del angulo como sum(x_i*w_i)
 
 #necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
-cosenos = zeros(1,n_neuronas);
-
+cosenos = zeros(n_neuronas,1);
 
 epoca = 1;
-t = 0; #tiempo. NO se resetea cuando acaba la epoca
+t = 0;
 while epoca <= n_iteraciones
   i = 1;
   #por cada muestra
-  while i<=numero_instancias #TODO: ufuncs
+  while i<=numero_instancias
     
     #se designa el alfa para esta muestra
     alfa = alfa_inicial/(1+(t/numero_instancias));
 
     muestra_actual = entrada(i,:);
-  
-    cosenos = muestra_actual*pesos';
+    
+    cosenos = sum(muestra_actual(1,1:tamanyo_entrada).*pesos(:,1:tamanyo_entrada),2);    
     [x,ganadora] = max(cosenos); #x se desecha, es el valor, nos interesa el indice
+    
     #modificamos el peso de la ganadora
     peso_no_normal = pesos(ganadora,:)+(muestra_actual.*alfa);
     normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2));
     pesos(ganadora,:) = (peso_no_normal)./(normas_nuevo_peso);
-  
+    
     #BUCLE DE ENCUENTRO Y MODIFICACION DE VECINAS
     #solo necesario cuando el radio de vecindad es > 0, si R=0, solo necesitamos modificar la ganadora
     if radio_vecindad > 0
+    
       #calculamos la fila y columna de la ganadora para hacer mas facil calculos siguientes
       #indice = (fila-1)*NUMCOL + columna
       #fila = ceil(indice/NUMCOL) (por el indexado por 1. Si fuera indexado por 0 seria floor)
@@ -81,7 +83,7 @@ while epoca <= n_iteraciones
       if columna_ganadora == 0
         columna_ganadora = columnas_smo;
       endif
-    
+      
       #se añade una fila a recorrer por cada unidad que aumenta el radio, mas la fila de la ganadora
       filas_a_recorrer = (radio_vecindad*2)+1;
       #idem
@@ -117,7 +119,7 @@ while epoca <= n_iteraciones
         recorriendo_fila++;
         fi++;
       end
-    endif
+    endif    
     i++;
     t++;
   end
@@ -142,14 +144,105 @@ etiquetas = zeros(n_neuronas,1);
 #se recorren todas las neuronas, se encuentra la muestra mas cercana, y se le aplica su clase
 im = 1;
 cosenos = zeros(numero_instancias,1);
+
 while im<=n_neuronas
-   
-  cosenos = entrada*pesos(im,:)'; #vector con los cosenos entre todas las entradas y la neurona actual
+      
+  cosenos = sum(entrada(:,1:tamanyo_entrada).*pesos(im,1:tamanyo_entrada),2); #vector con los cosenos entre todas las entradas y la neurona actual
   [x,muestra_ganadora] = max(cosenos);
   etiquetas(im) = salida_numerica(muestra_ganadora); #salida(i) corresponde a entrada(i)
   
   im++;
 end
+#etiquetado terminado 
 
 etiquetas_print = reshape(etiquetas,columnas_smo,filas_smo)'
-#etiquetado terminado 
+
+#MLP
+#para cada muestra de entrada calculamos la neurona ganadora, y se la pasamos de entrada a un MLP
+entrada_mlp = zeros(numero_instancias,2);
+cosenos = zeros(n_neuronas,1);
+i=1;
+while i<=numero_instancias
+
+  muestra_actual=entrada(i,1:tamanyo_entrada);
+  cosenos = sum(muestra_actual.*pesos(:,1:tamanyo_entrada),2);
+  [x,ganadora] = max(cosenos);
+  
+  fila_ganadora = ceil(ganadora/columnas_smo);
+  columna_ganadora = mod(ganadora,columnas_smo);
+  #debido al indexado por 1, lo que matematicamente es la columna 0, en realidad es la ultima
+  if columna_ganadora == 0
+     columna_ganadora = columnas_smo;
+  endif
+  
+  entrada_mlp(i,1) = fila_ganadora;
+  entrada_mlp(i,2) = columna_ganadora;
+  
+  i++;
+end
+
+csvwrite('../mlp/training.csv',vertcat([-1,-2,-3],[entrada_mlp,salida_numerica]))
+
+#TEST
+lines_test = dlmread('../originalFiles/digitos.test.normalizados.txt',' ');
+longitud_fichero = length(lines_test(:,1));
+
+indices_entradas = [1:4:longitud_fichero];
+numero_instancias = length(indices_entradas);
+entrada_test = lines(indices_entradas,:);
+
+#normalizado de las entradas
+entrada_test = [entrada_test,ones(numero_instancias,1)];
+normas_entradas = sqrt(sum(entrada_test.^2,2));
+entrada_test = entrada_test./normas_entradas ;
+
+indices_salida = [3:4:longitud_fichero];
+salida_deseada = lines(indices_salida,:);
+salida_deseada = repmat([0:tamanyo_salida-1],numero_instancias,1)(salida_deseada==0.9);
+salida_obtenida = zeros(numero_instancias,1);
+
+entrada_mlp = zeros(numero_instancias,2);
+
+fallos = 0;
+aciertos = 0;
+im = 1;
+cosenos = zeros(n_neuronas,1);
+#por cada muestra hallamos la neurona mas cercana, cuya etiqueta sera la clase de la entrada
+while im<=numero_instancias
+
+  muestra_actual=entrada_test(im,1:tamanyo_entrada);
+    
+  cosenos = sum(muestra_actual.*pesos(:,1:tamanyo_entrada),2);
+  [x,ganadora] = max(cosenos);
+
+  fila_ganadora = ceil(ganadora/columnas_smo);
+  columna_ganadora = mod(ganadora,columnas_smo);
+  #debido al indexado por 1, lo que matematicamente es la columna 0, en realidad es la ultima
+  if columna_ganadora == 0
+     columna_ganadora = columnas_smo;
+  endif
+  
+  entrada_mlp(im,1) = fila_ganadora;
+  entrada_mlp(im,2) = columna_ganadora;  
+  
+  if(etiquetas(ganadora) == salida_deseada(im))
+    aciertos++;
+  endif
+  salida_obtenida(im) = etiquetas(ganadora);
+  
+  if(salida_obtenida(im) != salida_deseada(im))
+    fallos++;
+  endif
+  im++;
+end
+
+tasa_error = (fallos/numero_instancias)*100
+
+nombre_fichero = '../mapas/it';
+nombre_fichero = strcat(nombre_fichero,int2str(n_iteraciones));
+nombre_fichero2 = strcat(nombre_fichero,'.txt');
+nombre_fichero = strcat(nombre_fichero,'.csv');
+
+csvwrite(nombre_fichero,etiquetas_print);
+csvwrite(nombre_fichero2,tasa_error);
+csvwrite('../mlp/test.csv',vertcat([-1,-2,-3],[entrada_mlp,salida_deseada]));
