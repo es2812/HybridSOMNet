@@ -20,7 +20,7 @@ normas_entradas = sqrt(sum(entrada.^2,2));
 entrada = entrada./normas_entradas ;
 
 #SMO. CONSTANTES:
-n_iteraciones = 6;
+n_iteraciones = 20;
 filas_smo = 12;
 columnas_smo = 8;
 radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1; #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
@@ -58,7 +58,7 @@ while epoca <= n_iteraciones
     
     #se designa el alfa para esta muestra
     alfa = alfa_inicial/(1+(t/numero_instancias));
-
+    
     muestra_actual = entrada(i,:);
     
     cosenos = sum(muestra_actual.*pesos,2);    
@@ -119,14 +119,14 @@ while epoca <= n_iteraciones
         recorriendo_fila++;
         fi++;
       end
-    endif    
+    endif
     i++;
     t++;
   end
   #se modifica el radio de vecindad, acabara siendo 0
-  if radio_vecindad>0
-    radio_vecindad--;
-  endif
+  if radio_vecindad >0
+    radio_vecindad --;
+  end
   epoca++;
 end
 
@@ -162,6 +162,7 @@ etiquetas_print = reshape(etiquetas,columnas_smo,filas_smo)'
 entrada_mlp = zeros(numero_instancias,n_neuronas);
 cosenos = zeros(n_neuronas,1);
 i=1;
+n=4;
 while i<=numero_instancias
 
   muestra_actual=entrada(i,:);
@@ -169,9 +170,16 @@ while i<=numero_instancias
   [x,ganadora] = max(cosenos);
   
   entrada_mlp(i,:) = cosenos';
+
+  #filtramos la entrada para hacerla mas reconocible para mlp
+  #escalado lineal, por cada entrada: e_i = e_i-max(e)/max(e)-min(e) 
+  entrada_mlp(i,:) = (entrada_mlp(i,:)-min(entrada_mlp(i,:)))/(max(entrada_mlp(i,:))-min(entrada_mlp(i,:))); 
   
   i++;
 end
+
+#potenciado a la n
+entrada_mlp=entrada_mlp.^n;
 
 csvwrite('../mlp/training.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_numerica]))
 
@@ -208,7 +216,9 @@ while im<=numero_instancias
   
   entrada_mlp(im,:) = cosenos';
   
-  
+  #filtramos la entrada para hacerla mas reconocible para mlp
+  #escalado lineal, por cada entrada: e_i = e_i-max(e)/max(e)-min(e) 
+  entrada_mlp(im,:) = (entrada_mlp(im,:)-min(entrada_mlp(im,:)))/(max(entrada_mlp(im,:))-min(entrada_mlp(im,:))); 
   salida_obtenida(im) = etiquetas(ganadora);
   
   if(salida_obtenida(im) != salida_deseada(im))
@@ -216,6 +226,7 @@ while im<=numero_instancias
   endif
   im++;
 end
+entrada_mlp=entrada_mlp.^n;
 
 tasa_error = (fallos/numero_instancias)*100
 
