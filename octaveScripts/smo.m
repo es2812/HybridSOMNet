@@ -8,24 +8,28 @@ tamanyo_salida = 10;
 #cada cuarta linea de la matriz (EN LINUX)
 indices_entradas = [1:4:longitud_fichero];
 #en WINDOWS descomentar esta linea:
-indices_entradas = [1:2:longitud_fichero];
+#indices_entradas = [1:2:longitud_fichero];
 numero_instancias = length(indices_entradas);
 entrada = lines(indices_entradas,:);
 
 #se añade una dimension a cada instancia para evitar igualdad de vectores al normalizar
 entrada = [entrada,ones(numero_instancias,1)];
 
-#se calcula la norma de cada instancia como la raiz cuadrada de la suma de los cuadrados
-#y se divide cada componente del vector por esta norma, tal quedan vectores de norma 1.
-normas_entradas = sqrt(sum(entrada.^2,2));
-entrada = entrada./normas_entradas ;
+#se calcula la norma de cada instancia y se divide cada componente del vector 
+#por esta norma, tal que quedan vectores de norma 1.
+i=1;
+while i<=numero_instancias
+  entrada(i,:) = entrada(i,:)./norm(entrada(i,:));
+  i++;  
+end
+
 
 #SMO. CONSTANTES:
-n_iteraciones = 20;
+n_iteraciones = 1000;
 filas_smo = 12;
 columnas_smo = 8;
 radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1; #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
-alfa_inicial = 10; #alfa inicial (probar 20)
+alfa_inicial = 20; #alfa inicial (probar 20)
 
 n_neuronas = filas_smo*columnas_smo; #tamaño del espacio de salida
 tam_espacio_entrada = tamanyo_entrada+1; #por la coordenada extra
@@ -36,8 +40,11 @@ pesos = (rand(n_neuronas,tamanyo_entrada)*10)-5;
 
 #normalizamos
 pesos = [pesos,ones(n_neuronas,1)]; #añadida coordenada extra
-normas_pesos = sqrt(sum(pesos.^2,2));
-pesos = pesos./normas_pesos;
+i=1;
+while i<=n_neuronas
+  pesos(i,:) = pesos(i,:)./norm(pesos(i,:));
+  i++;
+end
 
 #todos los vectores entrada y pesos son unitarios, por lo que podemos utilizar
 #el coseno del angulo entre ellos. El maximo coseno implicara la neurona mas cercana:
@@ -45,10 +52,7 @@ pesos = pesos./normas_pesos;
 #   analiticamente: x w = producto escalar = sum(x_i*w_i)
 #   geometricamente: x w = |x||w|cos(x,w) = 1*1*cos(x,w) = cos(x,w)
 #
-#por lo que podemos calcular el coseno del angulo como sum(x_i*w_i)
-
-#necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
-cosenos = zeros(n_neuronas,1);
+#por lo que podemos calcular el coseno del angulo como el producto escalar de x y w
 
 epoca = 1;
 t = 0;
@@ -56,19 +60,20 @@ while epoca <= n_iteraciones
   i = 1;
   #por cada muestra
   while i<=numero_instancias
-    
     #se designa el alfa para esta muestra
     alfa = alfa_inicial/(1+(t/numero_instancias));
     
     muestra_actual = entrada(i,:);
+     
+    #necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
+    cosenos = zeros(n_neuronas,1);
     
-    cosenos = sum(muestra_actual.*pesos,2);    
+    cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
     [x,ganadora] = max(cosenos); #x se desecha, es el valor, nos interesa el indice
     
     #modificamos el peso de la ganadora
     peso_no_normal = pesos(ganadora,:)+(muestra_actual.*alfa);
-    normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2));
-    pesos(ganadora,:) = (peso_no_normal)./(normas_nuevo_peso);
+    pesos(ganadora,:) = (peso_no_normal)./norm(peso_no_normal);
     
     #BUCLE DE ENCUENTRO Y MODIFICACION DE VECINAS
     #solo necesario cuando el radio de vecindad es > 0, si R=0, solo necesitamos modificar la ganadora
@@ -111,8 +116,7 @@ while epoca <= n_iteraciones
           #este metodo detecta tambien la propia neurona ganadora, que ya modificamos antes, la ignoramos
           if indice_v != ganadora
             peso_no_normal = pesos(indice_v,:)+(muestra_actual.*alfa);
-            normas_nuevo_peso = sqrt(sum(peso_no_normal.^2,2));
-            pesos(indice_v,:) = (peso_no_normal)./(normas_nuevo_peso);
+            pesos(indice_v,:) = (peso_no_normal)./norm(peso_no_normal);
           endif
           recorriendo_columna++;
           co++;
@@ -125,7 +129,7 @@ while epoca <= n_iteraciones
     t++;
   end
   #se modifica el radio de vecindad, acabara siendo 0
-  if radio_vecindad >0
+  if radio_vecindad > 0
     radio_vecindad --;
   end
   epoca++;
@@ -137,7 +141,7 @@ end
 #Para linux
 indices_salida = [3:4:longitud_fichero];
 #en WINDOWS descomentar esta linea:
-indices_salida = [2:2:longitud_fichero];
+#indices_salida = [2:2:longitud_fichero];
 #la salida esta formateada como un vector con tantos componentes con 0.9 en el 
 #numero al que corresponde y el resto 0.1s
 salida = lines(indices_salida,1:tamanyo_salida);
@@ -151,7 +155,7 @@ cosenos = zeros(numero_instancias,1);
 
 while im<=n_neuronas
   peso_actual = pesos(im,:);
-  cosenos = sum(entrada.*peso_actual,2); #vector con los cosenos entre todas las entradas y la neurona actual
+  cosenos = dot(entrada,repmat(peso_actual,numero_instancias,1),2); #vector con los cosenos entre todas las entradas y la neurona actual
   [x,muestra_ganadora] = max(cosenos);
   etiquetas(im) = salida_numerica(muestra_ganadora); #salida(i) corresponde a entrada(i)
   
@@ -170,7 +174,7 @@ n=4;
 while i<=numero_instancias
 
   muestra_actual=entrada(i,:);
-  cosenos = sum(muestra_actual.*pesos,2);
+  cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
   [x,ganadora] = max(cosenos);
   
   entrada_mlp(i,:) = cosenos';
@@ -193,19 +197,17 @@ longitud_fichero = length(lines_test(:,1));
 #LINUX
 indices_entradas = [1:4:longitud_fichero];
 #en WINDOWS descomentar esta linea:
-indices_entradas = [1:2:longitud_fichero];
+#indices_entradas = [1:2:longitud_fichero];
 numero_instancias = length(indices_entradas);
 entrada_test = lines(indices_entradas,:);
 
 #normalizado de las entradas
 entrada_test = [entrada_test,ones(numero_instancias,1)];
-normas_entradas = sqrt(sum(entrada_test.^2,2));
-entrada_test = entrada_test./normas_entradas ;
+entrada_test = entrada_test./norm(entrada_test);
 
 indices_salida = [3:4:longitud_fichero];
-
 #en WINDOWS descomentar esta linea:
-indices_salida = [2:2:longitud_fichero];
+#indices_salida = [2:2:longitud_fichero];
 
 salida_deseada = lines(indices_salida,:);
 salida_deseada = repmat([0:tamanyo_salida-1],numero_instancias,1)(salida_deseada==0.9);
@@ -221,7 +223,7 @@ while im<=numero_instancias
 
   muestra_actual=entrada_test(im,:);
     
-  cosenos = sum(muestra_actual.*pesos,2);
+  cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
   [x,ganadora] = max(cosenos);
   
   entrada_mlp(im,:) = cosenos';
@@ -234,6 +236,7 @@ while im<=numero_instancias
   if(salida_obtenida(im) != salida_deseada(im))
     fallos++;
   endif
+  
   im++;
 end
 entrada_mlp=entrada_mlp.^n;
