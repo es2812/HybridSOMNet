@@ -37,6 +37,7 @@ tam_espacio_entrada = tamanyo_entrada+1; #por la coordenada extra
 
 #inicializamos pesos aleatorios (entre -5 y 5)
 #p[i][j] = peso de la neurona i para la dimension del espacio de entrada j
+#no se añade en los pesos una columna extra de 1s
 pesos = (rand(n_neuronas,tamanyo_entrada+1)*10)-5;
 
 i=1;
@@ -69,7 +70,6 @@ while epoca <= n_iteraciones
     #necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
     cosenos = zeros(n_neuronas,1);
     
-    #cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
     cosenos = muestra_actual*pesos';
     [x,ganadora] = max(cosenos); #x se desecha, es el valor, nos interesa el indice
     
@@ -163,7 +163,6 @@ cosenos = zeros(numero_instancias,1);
 while im<=n_neuronas
   peso_actual = pesos(im,:);
   
-  #cosenos = dot(entrada,repmat(peso_actual,numero_instancias,1),2); #vector con los cosenos entre todas las entradas y la neurona actual
   cosenos = peso_actual*entrada';
   [x,muestra_ganadora] = max(cosenos);
   etiquetas(im) = salida_numerica(muestra_ganadora); #salida(i) corresponde a entrada(i)
@@ -175,6 +174,7 @@ end
 etiquetas_print = reshape(etiquetas,columnas_smo,filas_smo)'
 
 #MLP
+
 #para cada muestra de entrada calculamos los cosenos resultantes y los pasamos de entrada a un mlp
 entrada_mlp = zeros(numero_instancias,n_neuronas);
 cosenos = zeros(n_neuronas,1);
@@ -183,7 +183,6 @@ n=4;
 while i<=numero_instancias
 
   muestra_actual=entrada(i,:);
-  #cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
   cosenos = muestra_actual*pesos';
   [x,ganadora] = max(cosenos);
   
@@ -239,34 +238,27 @@ while im<=numero_instancias
 
   muestra_actual=entrada_test(im,:);
     
-  #cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
   cosenos = muestra_actual*pesos';
   [x,ganadora] = max(cosenos);
   
-  #entrada_mlp(im,:) = cosenos';
-  
-  #filtramos la entrada para hacerla mas reconocible para mlp
-  #escalado lineal, por cada entrada: e_i = e_i-max(e)/max(e)-min(e) 
-  #entrada_mlp(im,:) = (entrada_mlp(im,:)-min(entrada_mlp(im,:)))/(max(entrada_mlp(im,:))-min(entrada_mlp(im,:))); 
   salida_obtenida(im) = etiquetas(ganadora);
   
   if(salida_obtenida(im) != salida_numerica(im))
     fallos++;
   endif
   
+  #MLP
+  entrada_mlp(im,:) = cosenos';
+  
+  #filtramos la entrada para hacerla mas reconocible para mlp
+  #escalado lineal, por cada entrada: e_i = e_i-max(e)/max(e)-min(e) 
+  entrada_mlp(im,:) = (entrada_mlp(im,:)-min(entrada_mlp(im,:)))/(max(entrada_mlp(im,:))-min(entrada_mlp(im,:)));
   im++;
 end
-#entrada_mlp=entrada_mlp.^n;
+
+entrada_mlp=entrada_mlp.^n;
 
 tasa_error = (fallos/numero_instancias)*100;
 printf("Tasa de error: %f %s\n",tasa_error,"%")
 
-#nombre_fichero = '../mapas/it';
-#nombre_fichero = strcat(nombre_fichero,int2str(n_iteraciones));
-#nombre_fichero2 = strcat(nombre_fichero,'.txt');
-#nombre_fichero = strcat(nombre_fichero,'.csv');
-
-#csvwrite(nombre_fichero,etiquetas_print);
-#csvwrite(nombre_fichero2,tasa_error);
-
-#csvwrite('../mlp/test.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_deseada]));
+csvwrite('../mlp/test.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_numerica]));
