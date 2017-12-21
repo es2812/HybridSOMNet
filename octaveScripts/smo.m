@@ -10,7 +10,7 @@ indices_entradas = [1:4:longitud_fichero];
 #en WINDOWS descomentar esta linea:
 #indices_entradas = [1:2:longitud_fichero];
 numero_instancias = length(indices_entradas);
-entrada = lines(indices_entradas,:);
+entrada = (lines(indices_entradas,:) == 0.9); #se convierte la entrada a 0s y 1s 0.9->1
 
 #se añade una dimension a cada instancia para evitar igualdad de vectores al normalizar
 entrada = [entrada,ones(numero_instancias,1)];
@@ -25,10 +25,11 @@ end
 
 
 #SMO. CONSTANTES:
-n_iteraciones = 1000;
+n_iteraciones = 20;
 filas_smo = 12;
 columnas_smo = 8;
-radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1; #radio inicial ubre el maximo de la dimension mas pequeña sin overlap
+radio_vecindad = 3;
+#radio_vecindad = ceil(min(filas_smo,columnas_smo)/2)-1; #radio inicial cubre el maximo de la dimension mas pequeña sin overlap
 alfa_inicial = 20; #alfa inicial (probar 20)
 
 n_neuronas = filas_smo*columnas_smo; #tamaño del espacio de salida
@@ -36,10 +37,8 @@ tam_espacio_entrada = tamanyo_entrada+1; #por la coordenada extra
 
 #inicializamos pesos aleatorios (entre -5 y 5)
 #p[i][j] = peso de la neurona i para la dimension del espacio de entrada j
-pesos = (rand(n_neuronas,tamanyo_entrada)*10)-5;
+pesos = (rand(n_neuronas,tamanyo_entrada+1)*10)-5;
 
-#normalizamos
-pesos = [pesos,ones(n_neuronas,1)]; #añadida coordenada extra
 i=1;
 while i<=n_neuronas
   pesos(i,:) = pesos(i,:)./norm(pesos(i,:));
@@ -57,9 +56,11 @@ end
 epoca = 1;
 t = 0;
 while epoca <= n_iteraciones
+  
   i = 1;
   #por cada muestra
   while i<=numero_instancias
+  
     #se designa el alfa para esta muestra
     alfa = alfa_inicial/(1+(t/numero_instancias));
     
@@ -68,7 +69,8 @@ while epoca <= n_iteraciones
     #necesitamos los cosenos solo durante la muestra actual, nos sirve un vector
     cosenos = zeros(n_neuronas,1);
     
-    cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
+    #cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
+    cosenos = muestra_actual*pesos';
     [x,ganadora] = max(cosenos); #x se desecha, es el valor, nos interesa el indice
     
     #modificamos el peso de la ganadora
@@ -146,7 +148,12 @@ indices_salida = [3:4:longitud_fichero];
 #numero al que corresponde y el resto 0.1s
 salida = lines(indices_salida,1:tamanyo_salida);
 #obtenemos el digito que representa la salida
-salida_numerica = repmat([0:tamanyo_salida-1],numero_instancias,1)(salida==0.9);
+#salida_numerica = repmat([0:tamanyo_salida-1],numero_instancias,1)(salida==0.9);
+salida_numerica = zeros(numero_instancias,1);
+for i=1:numero_instancias
+  [x,salida_numerica(i)] = max(salida(i,:));
+  salida_numerica(i) -= 1; #los digitos van del 0-9
+endfor
 
 etiquetas = zeros(n_neuronas,1);
 #se recorren todas las neuronas, se encuentra la muestra mas cercana, y se le aplica su clase
@@ -155,7 +162,9 @@ cosenos = zeros(numero_instancias,1);
 
 while im<=n_neuronas
   peso_actual = pesos(im,:);
-  cosenos = dot(entrada,repmat(peso_actual,numero_instancias,1),2); #vector con los cosenos entre todas las entradas y la neurona actual
+  
+  #cosenos = dot(entrada,repmat(peso_actual,numero_instancias,1),2); #vector con los cosenos entre todas las entradas y la neurona actual
+  cosenos = peso_actual*entrada';
   [x,muestra_ganadora] = max(cosenos);
   etiquetas(im) = salida_numerica(muestra_ganadora); #salida(i) corresponde a entrada(i)
   
@@ -174,7 +183,8 @@ n=4;
 while i<=numero_instancias
 
   muestra_actual=entrada(i,:);
-  cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
+  #cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
+  cosenos = muestra_actual*pesos';
   [x,ganadora] = max(cosenos);
   
   entrada_mlp(i,:) = cosenos';
@@ -199,7 +209,7 @@ indices_entradas = [1:4:longitud_fichero];
 #en WINDOWS descomentar esta linea:
 #indices_entradas = [1:2:longitud_fichero];
 numero_instancias = length(indices_entradas);
-entrada_test = lines(indices_entradas,:);
+entrada_test = (lines(indices_entradas,:)==0.9);
 
 #normalizado de las entradas
 entrada_test = [entrada_test,ones(numero_instancias,1)];
@@ -210,7 +220,13 @@ indices_salida = [3:4:longitud_fichero];
 #indices_salida = [2:2:longitud_fichero];
 
 salida_deseada = lines(indices_salida,:);
-salida_deseada = repmat([0:tamanyo_salida-1],numero_instancias,1)(salida_deseada==0.9);
+
+salida_numerica = zeros(numero_instancias,1);
+for i=1:numero_instancias
+  [x,salida_numerica(i)] = max(salida_deseada(i,:));
+  salida_numerica(i) -= 1; #los digitos van del 0-9
+endfor
+
 salida_obtenida = zeros(numero_instancias,1);
 
 entrada_mlp = zeros(numero_instancias,n_neuronas);
@@ -223,25 +239,27 @@ while im<=numero_instancias
 
   muestra_actual=entrada_test(im,:);
     
-  cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
+  #cosenos = dot(repmat(muestra_actual,n_neuronas,1),pesos,2);
+  cosenos = muestra_actual*pesos';
   [x,ganadora] = max(cosenos);
   
-  entrada_mlp(im,:) = cosenos';
+  #entrada_mlp(im,:) = cosenos';
   
   #filtramos la entrada para hacerla mas reconocible para mlp
   #escalado lineal, por cada entrada: e_i = e_i-max(e)/max(e)-min(e) 
-  entrada_mlp(im,:) = (entrada_mlp(im,:)-min(entrada_mlp(im,:)))/(max(entrada_mlp(im,:))-min(entrada_mlp(im,:))); 
+  #entrada_mlp(im,:) = (entrada_mlp(im,:)-min(entrada_mlp(im,:)))/(max(entrada_mlp(im,:))-min(entrada_mlp(im,:))); 
   salida_obtenida(im) = etiquetas(ganadora);
   
-  if(salida_obtenida(im) != salida_deseada(im))
+  if(salida_obtenida(im) != salida_numerica(im))
     fallos++;
   endif
   
   im++;
 end
-entrada_mlp=entrada_mlp.^n;
+#entrada_mlp=entrada_mlp.^n;
 
-tasa_error = (fallos/numero_instancias)*100
+tasa_error = (fallos/numero_instancias)*100;
+printf("Tasa de error: %f %s\n",tasa_error,"%")
 
 #nombre_fichero = '../mapas/it';
 #nombre_fichero = strcat(nombre_fichero,int2str(n_iteraciones));
@@ -251,4 +269,4 @@ tasa_error = (fallos/numero_instancias)*100
 #csvwrite(nombre_fichero,etiquetas_print);
 #csvwrite(nombre_fichero2,tasa_error);
 
-csvwrite('../mlp/test.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_deseada]));
+#csvwrite('../mlp/test.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_deseada]));
