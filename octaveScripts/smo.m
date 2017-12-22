@@ -198,7 +198,7 @@ end
 #potenciado a la n
 entrada_mlp=entrada_mlp.^n;
 
-csvwrite('../mlp/training.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_numerica]))
+csvwrite('../mlp/training.csv',[entrada_mlp,salida_numerica])
 
 #TEST
 lines_test = dlmread('../originalFiles/digitos.test.normalizados.txt',' ');
@@ -261,4 +261,4 @@ entrada_mlp=entrada_mlp.^n;
 tasa_error = (fallos/numero_instancias)*100;
 printf("Tasa de error: %f %s\n",tasa_error,"%")
 
-csvwrite('../mlp/test.csv',vertcat([1:n_neuronas+1],[entrada_mlp,salida_numerica]));
+csvwrite('../mlp/test.csv',[entrada_mlp,salida_numerica]);
