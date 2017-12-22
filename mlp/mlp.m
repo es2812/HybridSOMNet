@@ -14,9 +14,9 @@ endfor
 capa_oculta = 20; #numero de neuronas en la capa oculta
 capa_salida = 10; #numero de neuronas en la capa de salida
 capa_entrada = dimension; #tendremos dimension neuronas en la capa de entrada
-max_epocas = 500;
+max_epocas = 3;
 factor_aprendizaje=0.9;
-termino_bias=1;
+bias=1;
 factor_inercia=0.2;
 
 %Normalización
@@ -26,8 +26,8 @@ for i=1:dimension
 endfor
 
 #peso wij conecta la neurona j con la i
-ww = (rand(capa_oculta,capa_entrada)*10)-5; #pesos capa oculta rand(-5,5)
-ws = (rand(capa_salida,capa_oculta)*10)-5; #pesos capa salida
+ww = (rand(capa_oculta,capa_entrada+1)*10)-5; #pesos capa oculta rand(-5,5) (+1 peso para el bias)
+ws = (rand(capa_salida,capa_oculta+1)*10)-5; #pesos capa salida idem
 
 %entrenamiento
 yy = zeros(1,capa_oculta); #salida capa oculta
@@ -37,17 +37,18 @@ ds = zeros(1,capa_salida); #termino delta capa salida
 
 #guardamos un array con el incremento del peso de la muestra anterior, que aplicaremos
 #a la iteracion actual para evitar caer en minimos locales
-inercia_o = zeros(capa_oculta,capa_entrada);
-inercia_s = zeros(capa_salida,capa_oculta);
+inercia_o = zeros(capa_oculta,capa_entrada+1);
+inercia_s = zeros(capa_salida,capa_oculta+1);
 
 for epoca=1:max_epocas
   for i=1:num_muestras
  
     %Fase hacia delante
-    muestra_actual = xx(i,:);
+    muestra_actual = [xx(i,:),bias]; #se añade un termino bias, que tendra su propio peso
     
-    yy = 1./(1+exp(-(muestra_actual*ww'+termino_bias))); #salida de la capa oculta (sigmoide)  
-    ys = atan(yy*ws'); #salida de la capa salida (arcotangente)
+    yy = 1./(1+exp(-(muestra_actual*ww'))); #salida de la capa oculta (sigmoide) 
+    entrada_siguiente_capa = [yy,bias]; 
+    ys = atan(entrada_siguiente_capa*ws'); #salida de la capa salida (arcotangente)
         
     %Fase hacia detras
     deseada_actual = salida_deseada(i,:);
@@ -64,6 +65,10 @@ for epoca=1:max_epocas
         ws(j,k) += incremento_peso;
         inercia_s(j,k) = incremento_peso; #actualizamos la inercia para la siguiente muestra
       endfor
+      #tenemos que modificar el peso del bias
+      incremento_peso = (factor_aprendizaje*ds(j)*bias)+(factor_inercia*inercia_s(j,capa_oculta+1));
+      ws(j,capa_oculta+1) += incremento_peso;
+      inercia_s(j,capa_oculta+1) = incremento_peso;
     endfor
     #capa oculta
     #en la capa oculta el termino delta de cada neurona es el producto de matrices de 
@@ -77,7 +82,11 @@ for epoca=1:max_epocas
         incremento_peso = (factor_aprendizaje*dd*muestra_actual(k))+(factor_inercia*inercia_o(j,k));
         ww(j,k) += incremento_peso;
         inercia_o(j,k) = incremento_peso;
-      endfor            
+      endfor   
+      #peso del bias
+      incremento_peso = (factor_aprendizaje*dd*bias)+(factor_inercia*inercia_o(j,capa_entrada+1));
+      ww(j,capa_entrada+1) += incremento_peso;
+      inercia_o(j,capa_entrada+1) = incremento_peso;     
     endfor 
   endfor
 endfor  
@@ -98,13 +107,14 @@ endfor
 
 fallos=0;
 for i=1:num_muestras
-  muestra_actual = xx(i,:);
+  muestra_actual = [xx(i,:),bias];
   
-   yy = 1./(1+exp(-(muestra_actual*ww'+termino_bias))); #salida de la capa oculta (sigmoide)  
-   ys = atan(yy*ws'); #salida de la capa salida (arcotangente)
+   yy = 1./(1+exp(-(muestra_actual*ww'))); #salida de la capa oculta (sigmoide)  
+   entrada_siguiente_capa = [yy,bias];
+   ys = atan(entrada_siguiente_capa*ws'); #salida de la capa salida (arcotangente)
   
    [r,salida_obtenida] = max(ys); #rechazamos r, el valor, nos interesa el indice
-   salida_obtenida += 1; #por la indexacion por 1
+   salida_obtenida -= 1; #por la indexacion por 1
    
    if(salida_obtenida != salida(i))
     fallos++;
