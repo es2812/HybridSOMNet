@@ -1,4 +1,4 @@
-function [tasa_error,training_mlp,test_mlp] = som(n_iteraciones,filas_smo,columnas_smo,alfa_inicial)
+function [tasa_aciertos,training_mlp,test_mlp] = som(n_iteraciones,filas_smo,columnas_smo,alfa_inicial)
   #ENTRENAMIENTO
   lines = dlmread('originalFiles/digitos.entrena.normalizados.txt',' ');
   longitud_fichero = length(lines(:,1));
@@ -230,7 +230,7 @@ function [tasa_error,training_mlp,test_mlp] = som(n_iteraciones,filas_smo,column
   
   entrada_mlp = zeros(numero_instancias,n_neuronas);
   
-  fallos = 0;
+  aciertos = 0;
   im = 1;
   cosenos = zeros(n_neuronas,1);
   #por cada muestra hallamos la neurona mas cercana, cuya etiqueta sera la clase de la entrada
@@ -243,8 +243,8 @@ function [tasa_error,training_mlp,test_mlp] = som(n_iteraciones,filas_smo,column
     
     salida_obtenida(im) = etiquetas(ganadora);
     
-    if(salida_obtenida(im) != salida_numerica(im))
-      fallos++;
+    if(salida_obtenida(im) == salida_numerica(im))
+      aciertos++;
     endif
     
     #MLP
@@ -258,7 +258,7 @@ function [tasa_error,training_mlp,test_mlp] = som(n_iteraciones,filas_smo,column
   
   entrada_mlp=entrada_mlp.^n;
   
-  tasa_error = (fallos/numero_instancias)*100;
+  tasa_aciertos = (aciertos/numero_instancias)*100;
   test_mlp = [entrada_mlp,salida_numerica];
   #csvwrite('test.csv',[entrada_mlp,salida_numerica]);
 endfunction
